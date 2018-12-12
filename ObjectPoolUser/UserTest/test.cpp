@@ -18,3 +18,8 @@ TEST(ObjectPool, IsCopyable)
 {
 	
 }
+
+TEST(ObjectPool, ActiveCount)
+{
+	
+}
