@@ -1,10 +1,14 @@
 #pragma once
 #include <array>
 #include <list>
-
+#include <algorithm>
 template<typename T, unsigned int POOL_SIZE =16>
 class ObjectPool
 {
+
+private :
+	template<typename T, unsigned int POOL_SIZE = 16>
+	friend void swap(ObjectPool<T, POOL_SIZE>& a, ObjectPool<T, POOL_SIZE>& b);
 public:
 
 	enum HandleOverflow
@@ -22,9 +26,10 @@ public:
 
 	}
 	//copy constructor
-	ObjectPool(const ObjectPool& other) : _size(other._size), _pool(other._pool)
+	ObjectPool(const ObjectPool& other) : _size(other._size), _pool(other._pool), _active(other._active)
 	{
-		std::copy(other._pool.begin(), other._pool.end(), _pool);
+		std::copy(other._pool.begin(), other._pool.end(), _pool.begin());
+		std::copy(other._active.begin(), other._active.end(), _active.begin());
 	}
 
 	//move constructor
@@ -41,10 +46,12 @@ public:
 			return *this;
 		}
 		_size = other._size;
-		_pool = {};
-		std::copy(other._pool.begin(), other._pool.end(), _pool);
+		_pool = other._pool;
+		_active = other._active;
+
+		std::copy(other._pool.begin(), other._pool.end(), _pool.begin());
+		std::copy(other._active.begin(), other._active.end(), _active.begin());
 		return *this;
-		static_assert(std::is_base_of<int,T>::value);
 	}
 
 	//move assignment
@@ -59,27 +66,27 @@ public:
 	
 	}
 
-	bool operator ==( const ObjectPool& other)
-	{
-		return _pool == other._pool && _active == other._active && _size == other._size;
-	}
 	size_t Count();
 	unsigned int ActiveCount();
-	T* GetObject();
-	bool Release(T ptrToFree);
+	T* const GetObject();
+	bool Release(T* ptrToFree);
 	bool IsFull();
+	bool IsEqualTo(const ObjectPool& other) const;
 
 private:
-	unsigned int _size;
+	unsigned int _size = POOL_SIZE;
 	std::array<T, POOL_SIZE> _pool;
 	std::array<bool, POOL_SIZE> _active;
-	friend void swap(ObjectPool & a, ObjectPool& b);
-
-	
-
 };
 
 
+template<typename T, unsigned int POOL_SIZE = 16>
+bool operator == (const ObjectPool<T, POOL_SIZE>& lhs, const ObjectPool<T, POOL_SIZE>& rhs)
+{
+	
+	return lhs.IsEqualTo(rhs);
+	
+}
 
 template <typename T, unsigned int POOL_SIZE>
 size_t ObjectPool<T, POOL_SIZE>::Count()
@@ -94,7 +101,7 @@ unsigned int ObjectPool<T, POOL_SIZE>::ActiveCount()
 }
 
 template <typename T, unsigned int POOL_SIZE>
- T* ObjectPool<T, POOL_SIZE>::GetObject() 
+ T* const ObjectPool<T, POOL_SIZE>::GetObject()
 {
 	
 	for(int i = 0; i <_active.size(); i++)
@@ -110,11 +117,11 @@ template <typename T, unsigned int POOL_SIZE>
 }
 
 template <typename T, unsigned int POOL_SIZE>
-bool ObjectPool<T, POOL_SIZE>::Release(T ptrToFree) //return true if the pointer was found and freed, else false
+bool ObjectPool<T, POOL_SIZE>::Release(T* ptrToFree) //return true if the pointer was found and freed, else false
 {
 	for(int i = 0; i< _pool.size(); i++)
 	{
-		if(_pool[i]==ptrToFree)
+		if(&_pool[i]==ptrToFree)
 		{
 			_active[i] = false;
 			return true;
@@ -129,12 +136,17 @@ bool ObjectPool<T, POOL_SIZE>::IsFull()
 	return ActiveCount() == Count();
 }
 
-template<typename T, unsigned int POOL_SIZE = 16>
-void swap(ObjectPool<T,POOL_SIZE>& a, ObjectPool<T,POOL_SIZE> b)
+template <typename T, unsigned POOL_SIZE>
+bool ObjectPool<T, POOL_SIZE>::IsEqualTo(const ObjectPool& other) const
+{
+	return _pool == other._pool && _active == other._active && _size == other._size;
+}
+
+template<typename T, unsigned int POOL_SIZE>
+void swap(ObjectPool<T, POOL_SIZE>& a, ObjectPool<T, POOL_SIZE>& b)
 {
 	std::swap(a._size, b._size);
 	std::swap(a._pool, b._pool);
 	std::swap(a._active, b._active);
 
 }
-
