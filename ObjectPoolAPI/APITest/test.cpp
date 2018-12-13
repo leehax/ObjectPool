@@ -83,6 +83,5 @@ TEST(ObjectPool, CanRelease)
 	EXPECT_EQ(*obj, 5);
 	EXPECT_TRUE(pool.Release(obj));
 	EXPECT_EQ(pool.ActiveCount(), 9);
-	obj1 = new int(5);
 	EXPECT_TRUE(pool.Release(obj1));
 }
