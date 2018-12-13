@@ -2,7 +2,7 @@
 #include <array>
 #include <list>
 
-template<typename T, size_t POOL_SIZE =16>
+template<typename T, unsigned int POOL_SIZE =16>
 class ObjectPool
 {
 public:
@@ -22,10 +22,8 @@ public:
 
 	}
 	//copy constructor
-	ObjectPool(const ObjectPool& other) 
+	ObjectPool(const ObjectPool& other) : _size(other._size), _pool(other._pool)
 	{
-		_pool(other._pool);
-		_size = other._size;
 		std::copy(other._pool.begin(), other._pool.end(), _pool);
 	}
 
@@ -46,6 +44,7 @@ public:
 		_pool = {};
 		std::copy(other._pool.begin(), other._pool.end(), _pool);
 		return *this;
+		static_assert(std::is_base_of<int,T>::value);
 	}
 
 	//move assignment
@@ -57,63 +56,61 @@ public:
 
 	~ObjectPool()
 	{
-		for (size_t i = 0; i < _pool.size(); i++)
-		{
-			delete _pool[i];
-			_pool[i] = nullptr;
-		}
-
-
+	
 	}
 
+	bool operator ==( const ObjectPool& other)
+	{
+		return _pool == other._pool && _active == other._active && _size == other._size;
+	}
 	size_t Count();
-	size_t ActiveCount();
-	const T GetObject();
-	bool Free(T ptrToFree);
-	bool Full();
+	unsigned int ActiveCount();
+	T* GetObject();
+	bool Release(T ptrToFree);
+	bool IsFull();
 
 private:
-	size_t _size;
+	unsigned int _size;
 	std::array<T, POOL_SIZE> _pool;
 	std::array<bool, POOL_SIZE> _active;
 	friend void swap(ObjectPool & a, ObjectPool& b);
+
 	
 
 };
 
 
 
-template <typename T, size_t POOL_SIZE>
+template <typename T, unsigned int POOL_SIZE>
 size_t ObjectPool<T, POOL_SIZE>::Count()
 {
 	return _pool.size();
 }
 
-template <typename T, size_t POOL_SIZE>
-size_t ObjectPool<T, POOL_SIZE>::ActiveCount()
+template <typename T, unsigned int POOL_SIZE>
+unsigned int ObjectPool<T, POOL_SIZE>::ActiveCount()
 {
 	return std::count_if(_active.begin(), _active.end(), [](bool b) {return b; });
 }
 
-template <typename T, size_t POOL_SIZE>
-const T ObjectPool<T, POOL_SIZE>::GetObject() 
+template <typename T, unsigned int POOL_SIZE>
+ T* ObjectPool<T, POOL_SIZE>::GetObject() 
 {
 	
-	for(int i = 0; i<_active.size(); i++)
+	for(int i = 0; i <_active.size(); i++)
 	{
 		if (!_active[i])
 		{			
-			auto obj = reinterpret_cast<T>(&_pool[i]);
 			_active[i] = true;
-			return reinterpret_cast<const T>(obj);
+			return &_pool[i];
 		}
 	}
 	return nullptr;
 	
 }
 
-template <typename T, size_t POOL_SIZE>
-bool ObjectPool<T, POOL_SIZE>::Free(T ptrToFree) //return true if the pointer was found and freed, else false
+template <typename T, unsigned int POOL_SIZE>
+bool ObjectPool<T, POOL_SIZE>::Release(T ptrToFree) //return true if the pointer was found and freed, else false
 {
 	for(int i = 0; i< _pool.size(); i++)
 	{
@@ -126,13 +123,13 @@ bool ObjectPool<T, POOL_SIZE>::Free(T ptrToFree) //return true if the pointer wa
 	return false;
 }
 
-template <typename T, size_t POOL_SIZE>
-bool ObjectPool<T, POOL_SIZE>::Full()
+template <typename T, unsigned int POOL_SIZE>
+bool ObjectPool<T, POOL_SIZE>::IsFull()
 {
 	return ActiveCount() == Count();
 }
 
-template<typename T, size_t POOL_SIZE = 16>
+template<typename T, unsigned int POOL_SIZE = 16>
 void swap(ObjectPool<T,POOL_SIZE>& a, ObjectPool<T,POOL_SIZE> b)
 {
 	std::swap(a._size, b._size);
