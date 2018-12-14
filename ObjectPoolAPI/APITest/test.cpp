@@ -43,16 +43,24 @@ TEST(ObjectPool, CanGet)
 
 	
 	int* obj = pool.GetObject();
+	EXPECT_EQ(pool.ActiveCount(), 1);
 	pool.GetObject();
+	EXPECT_EQ(pool.ActiveCount(), 2);
 	pool.GetObject();
+	EXPECT_EQ(pool.ActiveCount(), 3);
 	pool.GetObject();
+	EXPECT_EQ(pool.ActiveCount(), 4);
 	pool.GetObject();
+	EXPECT_EQ(pool.ActiveCount(), 5);
 	pool.GetObject();
+	EXPECT_EQ(pool.ActiveCount(), 6);
 	pool.GetObject();
+	EXPECT_EQ(pool.ActiveCount(), 7);
 	pool.GetObject();
+	EXPECT_EQ(pool.ActiveCount(), 8);
 	pool.GetObject();
+	EXPECT_EQ(pool.ActiveCount(), 9);
 	pool.GetObject();
-
 	*obj = 5;
 	EXPECT_EQ(pool.ActiveCount(), 10);
 	EXPECT_EQ(pool.GetObject(), nullptr);
@@ -77,11 +85,16 @@ TEST(ObjectPool, CanRelease)
 	pool.GetObject();
 	pool.GetObject();
 	pool.GetObject();
-	pool.GetObject();
 
 	*obj = 5;
+	std::unique_ptr<int> ptr = std::make_unique<int>(43);
+	std::unique_ptr<int> ptr2;
+	ptr.reset(new int);
+
 	EXPECT_EQ(*obj, 5);
-	EXPECT_TRUE(pool.Release(obj));
 	EXPECT_EQ(pool.ActiveCount(), 9);
+	EXPECT_TRUE(pool.Release(obj));
+	EXPECT_EQ(pool.ActiveCount(), 8);
 	EXPECT_TRUE(pool.Release(obj1));
+
 }

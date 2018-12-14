@@ -2,6 +2,8 @@
 #include <array>
 #include <list>
 #include <algorithm>
+
+
 template<typename T, unsigned int POOL_SIZE =16>
 class ObjectPool
 {
@@ -69,6 +71,8 @@ public:
 	size_t Count();
 	unsigned int ActiveCount();
 	T* const GetObject();
+
+
 	bool Release(T* ptrToFree);
 	bool IsFull();
 	bool IsEqualTo(const ObjectPool& other) const;
@@ -115,6 +119,8 @@ template <typename T, unsigned int POOL_SIZE>
 	return nullptr;
 	
 }
+
+
 
 template <typename T, unsigned int POOL_SIZE>
 bool ObjectPool<T, POOL_SIZE>::Release(T* ptrToFree) //return true if the pointer was found and freed, else false
