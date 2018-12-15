@@ -1,16 +1,46 @@
 #pragma once
-#include <array>
-#include <list>
-#include <algorithm>
-
-
-template<typename T, unsigned int POOL_SIZE =16>
+#include <utility>
+#include <memory>
+#include <stack>
+#include <stdexcept>
+#include <iostream>
+template<typename T, typename D = std::default_delete<T>>
 class ObjectPool
 {
 
 private :
-	template<typename T, unsigned int POOL_SIZE = 16>
-	friend void swap(ObjectPool<T, POOL_SIZE>& a, ObjectPool<T, POOL_SIZE>& b);
+	template<typename T, typename D = std::default_delete<T>>
+	friend void swap(ObjectPool<T, D>& a, ObjectPool<T, D>& b);
+
+	friend struct ReturnToPool;
+	
+	struct ReturnToPool
+	{
+		explicit ReturnToPool(std::weak_ptr<ObjectPool<T,D>*> pool): _weakPool(pool){}
+		void operator()(T* ptr) const
+		{
+			
+			if(auto pool_ptr=_weakPool.lock()) 
+			{
+				std::cout << "Return to Pool\n";
+				std::cout << ((ObjectPool*)*pool_ptr.get())->_sharedThis << '\n';
+			
+				(*pool_ptr.get())->Push(std::unique_ptr<T, D>{ptr});
+				//--(*pool_ptr.get())->_activeCount;
+			}
+			else
+			{
+				std::cout << "Pool is Dead\n";
+				D{}(ptr);  //if the pool doesnt exist anymore, delete using deleter D
+			}
+		}
+		
+
+	private:
+		std::weak_ptr<ObjectPool<T, D>*> _weakPool;
+	};
+
+
 public:
 
 	enum HandleOverflow
@@ -20,139 +50,178 @@ public:
 		INCREASE_SIZE //increase size of pool if needed
 	};
 
-	ObjectPool()
+	ObjectPool(size_t maxSize = 100) :_sharedThis(std::make_shared<ObjectPool<T,D>*>(this))
 	{
 		_pool = {};
-		_active = {};
-		_size = POOL_SIZE;
-
-	}
-	//copy constructor
-	ObjectPool(const ObjectPool& other) : _size(other._size), _pool(other._pool), _active(other._active)
-	{
-		std::copy(other._pool.begin(), other._pool.end(), _pool.begin());
-		std::copy(other._active.begin(), other._active.end(), _active.begin());
+		_maxSize = maxSize;
+		std::cout << _sharedThis << '\n';
 	}
 
-	//move constructor
-	ObjectPool(ObjectPool&& other)
-	{
-		swap(*this, other);
-	}
+	////disable copy constructor
+	//ObjectPool(const ObjectPool& other) = delete;
 
-	//copy assignment
-	ObjectPool& operator = (const ObjectPool& other)
-	{
-		if (&other == this)
-		{
-			return *this;
-		}
-		_size = other._size;
-		_pool = other._pool;
-		_active = other._active;
 
-		std::copy(other._pool.begin(), other._pool.end(), _pool.begin());
-		std::copy(other._active.begin(), other._active.end(), _active.begin());
-		return *this;
-	}
+	////move constructor
+	//ObjectPool(ObjectPool&& other):_sharedThis(other._sharedThis)
+	//{
+	//	swap(*this, other);
+	//}
 
-	//move assignment
-	ObjectPool& operator = (ObjectPool&& other)
-	{
-		swap(*this, other);
-		return *this;
-	}
+	////disable copy assignment
+	//ObjectPool& operator = (const ObjectPool& other) = delete;
+
+
+	////move assignment
+	//ObjectPool& operator = (ObjectPool&& other)
+	//{
+	//	//auto tmp = _sharedThis;
+	//	_sharedThis = other._sharedThis;
+	////	other._sharedThis = tmp;
+	//	swap(*this, other);
+	//	return *this;
+	//}
 
 	~ObjectPool()
 	{
 	
+		
 	}
 
 	size_t Count();
 	unsigned int ActiveCount();
-	T* const GetObject();
+	//T* const Pop();
+	std::unique_ptr<T, ReturnToPool> Pop();
+	void Push(std::unique_ptr<T, D> ptr);
 
-
-	bool Release(T* ptrToFree);
+	//bool Release(T* ptrToFree);
 	bool IsFull();
+	bool IsEmpty();
 	bool IsEqualTo(const ObjectPool& other) const;
-
+	std::shared_ptr<ObjectPool<T, D>*> _sharedThis;
 private:
-	unsigned int _size = POOL_SIZE;
-	std::array<T, POOL_SIZE> _pool;
-	std::array<bool, POOL_SIZE> _active;
+	//unsigned int _size = POOL_SIZE;
+	//std::array<T, POOL_SIZE> _pool;
+	//std::array<bool, 1> _active;
+	size_t _maxSize = 100;
+	std::stack <std::unique_ptr<T,D>> _pool;
+	size_t _activeCount = 0;
 };
 
+template <typename T, typename D>
+std::unique_ptr<T, typename ObjectPool<T, D>::ReturnToPool> ObjectPool<T, D>::Pop()
+{
+	if(IsEmpty())
+	{
+		throw std::out_of_range("Pool Is Empty");
+	}
+	
+	std::unique_ptr<T, ReturnToPool> ptr(_pool.top().release(),
+									ReturnToPool(
+									std::weak_ptr<ObjectPool<T,D>*>(_sharedThis)));
 
-template<typename T, unsigned int POOL_SIZE = 16>
-bool operator == (const ObjectPool<T, POOL_SIZE>& lhs, const ObjectPool<T, POOL_SIZE>& rhs)
+	_pool.pop();
+
+	return std::move(ptr);
+}
+
+template <typename T, typename D>
+void ObjectPool<T, D>::Push(std::unique_ptr<T, D> ptr)
+{
+	if(IsFull()) //and not set to overflow = allow resize
+	{
+		throw std::out_of_range("Pool Is Full");
+	}
+	try
+	{	_pool.push(std::move(ptr));
+	}
+	
+	catch (const std::bad_alloc&) {}
+	
+}
+
+
+template<typename T, typename D>
+bool operator == (const ObjectPool<T, D>& lhs, const ObjectPool<T, D>& rhs)
 {
 	
 	return lhs.IsEqualTo(rhs);
 	
 }
 
-template <typename T, unsigned int POOL_SIZE>
-size_t ObjectPool<T, POOL_SIZE>::Count()
+template <typename T,  typename D>
+size_t ObjectPool<T, D>::Count()
 {
 	return _pool.size();
 }
 
-template <typename T, unsigned int POOL_SIZE>
-unsigned int ObjectPool<T, POOL_SIZE>::ActiveCount()
+template <typename T, typename D>
+unsigned int ObjectPool<T, D>::ActiveCount()
 {
-	return std::count_if(_active.begin(), _active.end(), [](bool b) {return b; });
+	return _activeCount;
+//	return std::count_if(_active.begin(), _active.end(), [](bool b) {return b; });
 }
 
-template <typename T, unsigned int POOL_SIZE>
- T* const ObjectPool<T, POOL_SIZE>::GetObject()
+//template <typename T, typename D>
+// T* const ObjectPool<T, D>::Pop()
+//{
+//	
+//	for(int i = 0; i <_active.size(); i++)
+//	{
+//		if (!_active[i])
+//		{			
+//			_active[i] = true;
+//			return &_pool[i];
+//		}
+//	}
+//	return nullptr;
+//	
+//}
+//
+
+
+//template <typename T, typename D>
+//bool ObjectPool<T,D>::Release(T* ptrToFree) //return true if the pointer was found and freed, else false
+//{
+//	for(int i = 0; i< _pool.size(); i++)
+//	{
+//		if(&_pool[i]==ptrToFree)
+//		{
+//			_active[i] = false;
+//			return true;
+//		}
+//	}
+//	throw std::invalid_argument("Couldn't release the pointer");
+//	return false;
+//}
+
+template <typename T, typename D>
+bool ObjectPool<T, D>::IsFull()
 {
-	
-	for(int i = 0; i <_active.size(); i++)
-	{
-		if (!_active[i])
-		{			
-			_active[i] = true;
-			return &_pool[i];
-		}
-	}
-	return nullptr;
-	
+	return _pool.size() == _maxSize;
 }
 
-
-
-template <typename T, unsigned int POOL_SIZE>
-bool ObjectPool<T, POOL_SIZE>::Release(T* ptrToFree) //return true if the pointer was found and freed, else false
+template <typename T, typename D>
+bool ObjectPool<T, D>::IsEmpty()
 {
-	for(int i = 0; i< _pool.size(); i++)
-	{
-		if(&_pool[i]==ptrToFree)
-		{
-			_active[i] = false;
-			return true;
-		}
-	}
-	return false;
+	return _pool.empty();
 }
 
-template <typename T, unsigned int POOL_SIZE>
-bool ObjectPool<T, POOL_SIZE>::IsFull()
+template <typename T, typename D>
+bool ObjectPool<T, D>::IsEqualTo(const ObjectPool& other) const
 {
-	return ActiveCount() == Count();
+	return _pool == other._pool && _maxSize == other._maxSize;
 }
 
-template <typename T, unsigned POOL_SIZE>
-bool ObjectPool<T, POOL_SIZE>::IsEqualTo(const ObjectPool& other) const
+template<typename T, typename D>
+void swap(ObjectPool<T, D>& a, ObjectPool<T, D>& b)
 {
-	return _pool == other._pool && _active == other._active && _size == other._size;
-}
-
-template<typename T, unsigned int POOL_SIZE>
-void swap(ObjectPool<T, POOL_SIZE>& a, ObjectPool<T, POOL_SIZE>& b)
-{
-	std::swap(a._size, b._size);
+	std::swap(a._maxSize, b._maxSize);
 	std::swap(a._pool, b._pool);
-	std::swap(a._active, b._active);
+	//std::swap(a._sharedThis, b._sharedThis);
+	std::swap(a._activeCount, b._activeCount);
+	
+	//a._sharedThis.swap(b._sharedThis);
+	
+	//std::swap(a._active, b._active);
 
 }
