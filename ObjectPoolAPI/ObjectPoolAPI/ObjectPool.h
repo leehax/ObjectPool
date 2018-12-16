@@ -12,33 +12,6 @@ private :
 	template<typename T, typename D = std::default_delete<T>>
 	friend void swap(ObjectPool<T, D>& a, ObjectPool<T, D>& b);
 
-	friend struct ReturnToPool;
-	
-	struct ReturnToPool
-	{
-		explicit ReturnToPool(std::weak_ptr<ObjectPool<T,D>*> pool): _weakPool(pool){}
-		void operator()(T* ptr) const
-		{
-			
-			if(auto pool_ptr=_weakPool.lock()) 
-			{
-				std::cout << "Return to Pool\n";
-				std::cout << ((ObjectPool*)*pool_ptr.get())->_sharedThis << '\n';
-			
-				(*pool_ptr.get())->Push(std::unique_ptr<T, D>{ptr});
-				//--(*pool_ptr.get())->_activeCount;
-			}
-			else
-			{
-				std::cout << "Pool is Dead\n";
-				D{}(ptr);  //if the pool doesnt exist anymore, delete using deleter D
-			}
-		}
-		
-
-	private:
-		std::weak_ptr<ObjectPool<T, D>*> _weakPool;
-	};
 
 
 public:
@@ -62,6 +35,35 @@ public:
 	ObjectPool(ObjectPool&& other) = delete;
 	ObjectPool& operator = (const ObjectPool& other) = delete;
 	ObjectPool& operator = (ObjectPool&& other) = delete;
+
+
+	friend struct ReturnToPool;
+
+	struct ReturnToPool
+	{
+		explicit ReturnToPool(std::weak_ptr<ObjectPool<T, D>*> pool) : _weakPool(pool) {}
+		void operator()(T* ptr) const
+		{
+
+			if (auto pool_ptr = _weakPool.lock())
+			{
+				std::cout << "Return to Pool\n"; //todo: remove this and friend struct
+				std::cout << ((ObjectPool*)*pool_ptr.get())->_sharedThis << '\n';
+
+				(*pool_ptr.get())->Push(std::unique_ptr<T, D>{ptr});
+				//--(*pool_ptr.get())->_activeCount;
+			}
+			else
+			{
+				std::cout << "Pool is Dead\n";
+				D{}(ptr);  //if the pool doesnt exist anymore, delete using deleter D
+			}
+		}
+
+
+	private:
+		std::weak_ptr<ObjectPool<T, D>*> _weakPool;
+	};
 
 	//disable copy constructor
 	//ObjectPool(const ObjectPool& other) = delete;
