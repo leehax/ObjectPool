@@ -57,7 +57,13 @@ public:
 		std::cout << _sharedThis << '\n';
 	}
 
-	////disable copy constructor
+	//disable copy and move semantics
+	ObjectPool(const ObjectPool& other) = delete;
+	ObjectPool(ObjectPool&& other) = delete;
+	ObjectPool& operator = (const ObjectPool& other) = delete;
+	ObjectPool& operator = (ObjectPool&& other) = delete;
+
+	//disable copy constructor
 	//ObjectPool(const ObjectPool& other) = delete;
 
 
@@ -81,27 +87,20 @@ public:
 	//	return *this;
 	//}
 
-	~ObjectPool()
-	{
-	
-		
-	}
+	~ObjectPool() = default;
 
 	size_t Count();
 	unsigned int ActiveCount();
-	//T* const Pop();
 	std::unique_ptr<T, ReturnToPool> Pop();
 	void Push(std::unique_ptr<T, D> ptr);
 
-	//bool Release(T* ptrToFree);
+
 	bool IsFull();
 	bool IsEmpty();
 	bool IsEqualTo(const ObjectPool& other) const;
 	std::shared_ptr<ObjectPool<T, D>*> _sharedThis;
 private:
-	//unsigned int _size = POOL_SIZE;
-	//std::array<T, POOL_SIZE> _pool;
-	//std::array<bool, 1> _active;
+	
 	size_t _maxSize = 100;
 	std::stack <std::unique_ptr<T,D>> _pool;
 	size_t _activeCount = 0;
@@ -120,7 +119,6 @@ std::unique_ptr<T, typename ObjectPool<T, D>::ReturnToPool> ObjectPool<T, D>::Po
 									std::weak_ptr<ObjectPool<T,D>*>(_sharedThis)));
 
 	_pool.pop();
-
 	return std::move(ptr);
 }
 
@@ -129,7 +127,7 @@ void ObjectPool<T, D>::Push(std::unique_ptr<T, D> ptr)
 {
 	if(IsFull()) //and not set to overflow = allow resize
 	{
-		throw std::out_of_range("Pool Is Full");
+		throw std::length_error("Pool Is Full");
 	}
 	try
 	{	_pool.push(std::move(ptr));
@@ -217,8 +215,24 @@ void swap(ObjectPool<T, D>& a, ObjectPool<T, D>& b)
 {
 	std::swap(a._maxSize, b._maxSize);
 	std::swap(a._pool, b._pool);
-	//std::swap(a._sharedThis, b._sharedThis);
+	std::swap(a._sharedThis, b._sharedThis);
 	std::swap(a._activeCount, b._activeCount);
+
+	//size_t size = a._pool.size();
+	//for ( int i=0; i<size; i++)
+	//{
+	//	a._pool.pop();
+	//}
+	////a._pool.swap(b._pool);
+
+	//size_t sizeB = b._pool.size();
+	//for(int i=0; i<size;i++)
+	//{
+	//	std::unique_ptr < T,D > ptr(b._pool.top().release());
+	//	b._pool.pop();
+	//	a._pool.push(std::move(ptr));
+	//}
+
 	
 	//a._sharedThis.swap(b._sharedThis);
 	

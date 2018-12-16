@@ -2,7 +2,6 @@
 #include <iostream>
 
 
-int * a;
 int main()
 {
 	auto a = std::make_shared<int>(6);
@@ -25,8 +24,8 @@ int main()
 	pool.Push(std::make_unique<int>(50));
 
 	//auto obj = pool.Pop();
-	auto i = new int;
-	*i = 5;
+	auto myInt = new int;
+	*myInt = 5;
 	std::cout << pool.Count() << '\n';
 	std::cout << pool.ActiveCount() << '\n';
 //	pool.Pop();
