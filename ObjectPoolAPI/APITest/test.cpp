@@ -2,37 +2,81 @@
 #include "../ObjectPoolAPI/ObjectPool.h"
 #include "../ObjectPoolAPI/IPoolable.h"
 
+class TestPoolable : public IPoolable
+{
+public:
+	TestPoolable(){}
 
+	TestPoolable(const int name)
+	{
+		test = 5;
+		_name = name;
+	}
+	int _name = 0;
+private:
+	int test = 0;
+};
+
+void DoSomethingExpensive() //approx 20ms 
+{
+	for (int i = 0; i < 10000; i++)
+	{
+		for (int j = 0; j < 1000; j++) {
+
+		}
+	}
+}
 TEST(ObjectPool, IsDefaultConstructible)
 {
-	ObjectPool<int> pool;
-	EXPECT_EQ(pool.Count(),0);
+	ObjectPool<TestPoolable> pool(20,1);
+	EXPECT_EQ(pool.Count(),20);
 
 }
 
 TEST(ObjectPool, ConstructorSetsMaxSize)
 {
-	ObjectPool<int> pool(1);
-	EXPECT_EQ(pool.Count(), 0);
-	pool.Push(std::make_unique<int>(5));
+	{
+		ObjectPool<TestPoolable> pool(1, 1);
+		EXPECT_EQ(pool.Count(), 1);
+	}
+	{
+		ObjectPool<TestPoolable> pool(10, 1);
+		EXPECT_EQ(pool.Count(), 10);
+	}
+	{
+		ObjectPool<TestPoolable> pool(660, 1);
+		EXPECT_EQ(pool.Count(), 660);
+	}
+	{
+		ObjectPool<TestPoolable> pool(-10, 1);
+		EXPECT_EQ(pool.Count(), 10);
+	}
+	{
+		ObjectPool<TestPoolable> pool(100, 1);
+		EXPECT_EQ(pool.Count(), 100);
+	}
+	{
+		ObjectPool<TestPoolable> pool(5, 1);
+		EXPECT_EQ(pool.Count(), 5);
+	}
+
+
+	//pool.Push(std::make_unique<int>(5));
 
 }
 
 TEST(ObjectPool, ThrowsOnOutOfRange)
 {
-	ObjectPool<int> pool;
+	ObjectPool<TestPoolable> pool(0, 1);
 	EXPECT_THROW(pool.Pop(), std::out_of_range);
 }
 
 
 TEST(ObjectPool, CanGet)
 {
-	ObjectPool<int> pool;
+	ObjectPool<TestPoolable> pool(10, 1);
 
-	for(int i = 0 ; i<10;i++)
-	{
-		pool.Push(std::make_unique<int>(i));
-	}
+
 	EXPECT_EQ(pool.Count(), 10);
 	auto obj = pool.Pop();
 	EXPECT_EQ(pool.Count(), 9);
@@ -41,15 +85,16 @@ TEST(ObjectPool, CanGet)
 
 TEST(ObjectPool, PointersReturnToPoolAfterReset)
 {
-	ObjectPool<int> pool;
-	pool.Push(std::make_unique<int>(50));
+	ObjectPool<TestPoolable> pool(1, 1);
+	//pool.Push(std::make_unique<int>(50));
 	EXPECT_EQ(pool.Count(), 1);
 	auto obj = pool.Pop();
+	obj->_name = 50;
 	EXPECT_EQ(pool.Count(), 0);
 	EXPECT_THROW(pool.Pop(), std::out_of_range);
-	EXPECT_EQ(*obj, 50);
-	*obj = 4;
-	EXPECT_EQ(*obj, 4);
+	EXPECT_EQ(obj->_name, 50);
+	obj->_name = 4;
+	EXPECT_EQ(obj->_name, 4);
 	obj.reset(nullptr);
 	EXPECT_EQ(pool.Count(), 1);
 }
@@ -57,11 +102,7 @@ TEST(ObjectPool, PointersReturnToPoolAfterReset)
 
 TEST(ObjectPool, RAII)
 {
-	ObjectPool<int> pool;
-	for (int i = 0; i < 10; i++)
-	{
-		pool.Push(std::make_unique<int>(i));
-	}
+	ObjectPool<TestPoolable> pool(10, 1);
 
 	{
 		auto obj = pool.Pop();
@@ -73,104 +114,192 @@ TEST(ObjectPool, RAII)
 
 TEST(ObjectPool, EqualityComparable)
 {
-	ObjectPool<int> pool;
-	ObjectPool<int> pool1;
-	
-	EXPECT_TRUE(pool == pool1);
-	pool.Push(std::make_unique<int>(15));
-	pool1.Push(std::make_unique<int>(15));
+	ObjectPool<TestPoolable> pool(5,1);
+	ObjectPool<TestPoolable> pool1(5,1);
 
+	EXPECT_TRUE(pool == pool1);
+	{
+		auto obj = pool.Pop();
+	}
+	EXPECT_TRUE(pool == pool1);
+
+	auto obj = pool.Pop();
 	EXPECT_FALSE(pool == pool1);
 }
 
 
-class TestPoolable : public IPoolable
-{
-public:
-	TestPoolable(const std::string name)
-	{
-		test = 5;
-		_name = name;
-	}
-	std::string _name = "";
-private:
-	int test = 0;
-};
 
-void DoSomethingExpensive() //approx 200ms 
-{
-	for (int i = 0; i < 10000; i++)
-	{
-		for (int j = 0; j < 10000; j++) {
-		
-		}
-	}
-}
-TEST(Poolable, TimeAliveReturnsCorrect)
-{
-	TestPoolable t("t");
-	auto time= t.TimeAlive();
-	EXPECT_TRUE(time== t.TimeAlive());
-	DoSomethingExpensive();
-	EXPECT_FALSE(time == t.TimeAlive());
-	EXPECT_TRUE(t.TimeAlive() > time);
-}
+
 //this should be in user test
 TEST(ObjectPool, KillsOldestPoolable)
 {
-	ObjectPool<TestPoolable> pool(5);
-	std::vector<std::unique_ptr<TestPoolable,ObjectPool<TestPoolable>::ReturnToPool>> activePoolables;
+	ObjectPool<TestPoolable> pool(5, 0);
+	std::vector<std::unique_ptr<TestPoolable, ObjectPool<TestPoolable>::ReturnToPool>> activePool;
 
-	pool.Push(std::make_unique<TestPoolable>("first"));
-	DoSomethingExpensive();
-	pool.Push(std::make_unique<TestPoolable>("second"));
-	DoSomethingExpensive();
-	pool.Push(std::make_unique<TestPoolable>("third"));
-	DoSomethingExpensive();
-	pool.Push(std::make_unique<TestPoolable>("fourth"));
-	DoSomethingExpensive();
-	pool.Push(std::make_unique<TestPoolable>("fifth"));
-
-	const size_t poolSize = pool.Count();
-	for(unsigned int i = 0; i < poolSize; i++)
+	for (int i = 0; i < 5; i++)
 	{
-		activePoolables.push_back(pool.Pop());
-		
+		auto obj = pool.Pop();
+		obj->_name = i;
+		activePool.push_back(std::move(obj));
+		DoSomethingExpensive();
 	}
 
 
-	EXPECT_TRUE(pool.Count()== 0);
-	EXPECT_TRUE(activePoolables.size() == 5);
+	EXPECT_EQ(pool.Count(), 0);
+
+	for (int i = 0; i < 5; i++)
+	{
+		EXPECT_EQ(activePool[i]->_name, i);
+	}
+
 
 	try
 	{
-		activePoolables.push_back(pool.Pop());
+		activePool.push_back(pool.Pop());
 	}
-	catch(...)
-	{
-		//pool was empty
-
+	catch (...) {
 		std::chrono::milliseconds longestTime = std::chrono::milliseconds::min();
-		unsigned int longest = activePoolables.size() + 1;
-		for(unsigned int i = 0; i < activePoolables.size(); i++)
+		unsigned int longest = activePool.size() + 1;
+		for (unsigned int k = 0; k < activePool.size(); k++)
 		{
-			if(activePoolables[i]->TimeAlive() > longestTime)
+			if (activePool[k]->TimeAlive() > longestTime)
 			{
-				longestTime = activePoolables[i]->TimeAlive();
-				longest = i;
+				longestTime = activePool[k]->TimeAlive();
+				longest = k;
 			}
 		}
+		if (longest < activePool.size()) {
+			EXPECT_EQ(activePool[longest]->_name, 0);
+			activePool.erase(activePool.begin() + longest);
 
-		if(longest < activePoolables.size())
-		{
-			EXPECT_EQ(activePoolables[longest]->_name, "first");
-			activePoolables[longest].reset(nullptr);
-			activePoolables.erase(activePoolables.begin() + longest);
-			EXPECT_TRUE(activePoolables.size() ==4);
-			EXPECT_TRUE(pool.Count() == 1);
-			activePoolables.push_back(pool.Pop());
-			EXPECT_TRUE(activePoolables.size() == 5);
-			EXPECT_TRUE(pool.Count() == 0);
 		}
 	}
+
+	EXPECT_EQ(activePool.size(), 4);
+	EXPECT_EQ(pool.Count(), 1);
+
+	activePool.push_back(pool.Pop());
+	EXPECT_EQ(activePool.size(), 5);
+	try
+	{
+		activePool.push_back(pool.Pop());
+	}
+	catch (...) {
+		std::chrono::milliseconds longestTime = std::chrono::milliseconds::min();
+		unsigned int longest = activePool.size() + 1;
+		for (unsigned int k = 0; k < activePool.size(); k++)
+		{
+			if (activePool[k]->TimeAlive() > longestTime)
+			{
+				longestTime = activePool[k]->TimeAlive();
+				longest = k;
+			}
+		}
+		if (longest < activePool.size()) {
+			EXPECT_EQ(activePool[longest]->_name, 1);
+			activePool.erase(activePool.begin() + longest);
+
+		}
+	}
+
+	EXPECT_EQ(activePool.size(), 4);
+	EXPECT_EQ(pool.Count(), 1);
+
+	activePool.push_back(pool.Pop());
+	EXPECT_EQ(activePool.size(), 5);
+	try
+	{
+		activePool.push_back(pool.Pop());
+	}
+	catch (...) {
+		std::chrono::milliseconds longestTime = std::chrono::milliseconds::min();
+		unsigned int longest = activePool.size() + 1;
+		for (unsigned int k = 0; k < activePool.size(); k++)
+		{
+			if (activePool[k]->TimeAlive() > longestTime)
+			{
+				longestTime = activePool[k]->TimeAlive();
+				longest = k;
+			}
+		}
+		if (longest < activePool.size()) {
+			EXPECT_EQ(activePool[longest]->_name, 2);
+			activePool.erase(activePool.begin() + longest);
+
+		}
+	}
+
+	EXPECT_EQ(activePool.size(), 4);
+	EXPECT_EQ(pool.Count(), 1);
+
+	activePool.push_back(pool.Pop());
+	EXPECT_EQ(activePool.size(), 5);
+	try
+	{
+		activePool.push_back(pool.Pop());
+	}
+	catch (...) {
+		
+		std::chrono::milliseconds longestTime = std::chrono::milliseconds::min();
+		unsigned int longest = activePool.size() + 1;
+		for (unsigned int k = 0; k < activePool.size(); k++)
+		{
+			if (activePool[k]->TimeAlive() > longestTime)
+			{
+				longestTime = activePool[k]->TimeAlive();
+				longest = k;
+			}
+		}
+		if (longest < activePool.size()) {
+			EXPECT_EQ(activePool[longest]->_name, 3);
+			activePool.erase(activePool.begin() + longest);
+
+		}
+	}
+
+	EXPECT_EQ(activePool.size(), 4);
+	EXPECT_EQ(pool.Count(), 1);
+
+	activePool.push_back(pool.Pop());
+	EXPECT_EQ(activePool.size(), 5);
+	try
+	{
+		activePool.push_back(pool.Pop());
+	}
+	catch (...) {
+		std::chrono::milliseconds longestTime = std::chrono::milliseconds::min();
+		unsigned int longest = activePool.size() + 1;
+		for (unsigned int k = 0; k < activePool.size(); k++)
+		{
+			if (activePool[k]->TimeAlive() > longestTime)
+			{
+				longestTime = activePool[k]->TimeAlive();
+				longest = k;
+				std::cout << longestTime.count() << '\n';
+			}
+		}
+		if (longest < activePool.size()) {
+			EXPECT_EQ(activePool[longest]->_name, 4);
+			activePool.erase(activePool.begin() + longest);
+
+		}
+	}
+
+	EXPECT_EQ(activePool.size(), 4);
+	EXPECT_EQ(pool.Count(), 1);
+
+	activePool.push_back(pool.Pop());
+
+
+}
+
+TEST(Poolable, TimeAliveReturnsCorrect)
+{
+	TestPoolable t(1);
+
+	auto time = t.TimeAlive();
+	EXPECT_TRUE(time == t.TimeAlive());
+	DoSomethingExpensive();
+	EXPECT_FALSE(time == t.TimeAlive());
+	EXPECT_TRUE(t.TimeAlive() > time);
 }
