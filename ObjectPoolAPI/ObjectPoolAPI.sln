@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ObjectPoolAPI", "ObjectPool
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "APITest", "APITest\APITest.vcxproj", "{3E66D697-7FF9-4192-A9C5-5AD96D5759B1}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UserTest", "UserTest\UserTest.vcxproj", "{FC80FFA9-6FFB-48B8-9C98-C29B85805F21}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{3E66D697-7FF9-4192-A9C5-5AD96D5759B1}.Release|x64.Build.0 = Release|x64
 		{3E66D697-7FF9-4192-A9C5-5AD96D5759B1}.Release|x86.ActiveCfg = Release|Win32
 		{3E66D697-7FF9-4192-A9C5-5AD96D5759B1}.Release|x86.Build.0 = Release|Win32
+		{FC80FFA9-6FFB-48B8-9C98-C29B85805F21}.Debug|x64.ActiveCfg = Debug|x64
+		{FC80FFA9-6FFB-48B8-9C98-C29B85805F21}.Debug|x64.Build.0 = Debug|x64
+		{FC80FFA9-6FFB-48B8-9C98-C29B85805F21}.Debug|x86.ActiveCfg = Debug|Win32
+		{FC80FFA9-6FFB-48B8-9C98-C29B85805F21}.Debug|x86.Build.0 = Debug|Win32
+		{FC80FFA9-6FFB-48B8-9C98-C29B85805F21}.Release|x64.ActiveCfg = Release|x64
+		{FC80FFA9-6FFB-48B8-9C98-C29B85805F21}.Release|x64.Build.0 = Release|x64
+		{FC80FFA9-6FFB-48B8-9C98-C29B85805F21}.Release|x86.ActiveCfg = Release|Win32
+		{FC80FFA9-6FFB-48B8-9C98-C29B85805F21}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -7,42 +7,13 @@
 #include <complex>
 #include <vector>
 #include "IPoolable.h"
-enum HandleOverflow
-{
-	KILL_NEW, //don't create a new object if our pool has no free slots
-	KILL_EXISTING, //kill an existing object to allow creation of new, this only works if the pooled type implements ipoolable
-	INCREASE_SIZE //increase size of pool if needed
-};
 
 template<typename T, typename D = std::default_delete<T>>
 class ObjectPool
 {
-
-	static_assert(std::is_base_of<IPoolable, T>::value, "Must implement IPoolable");
+	static_assert(std::is_base_of<IPoolable, T>::value, "Poolable type must implement IPoolable");
 	template<typename T, typename D = std::default_delete<T>>
 	friend void swap(ObjectPool<T, D>& a, ObjectPool<T, D>& b);
-
-public:
-	
-	template <class... Args>
-	ObjectPool(int maxSize = 20, Args const&...args) :_sharedThis(std::make_shared<ObjectPool<T,D>*>(this))
-	{
-		
-		_pool = {};
-		_maxSize = std::abs(maxSize);
-		std::cout << _sharedThis << '\n';
-		for(unsigned int i = 0; i<_maxSize; i++)
-		{
-			_pool.push(T(args...));
-		}
-	}
-
-	//disable copy and move semantics as they will break the return to pool deleter
-	ObjectPool(const ObjectPool& other) = delete;
-	ObjectPool(ObjectPool&& other) = delete;
-	ObjectPool& operator = (const ObjectPool& other) = delete;
-	ObjectPool& operator = (ObjectPool&& other) = delete;
-
 	struct ReturnToPool
 	{
 		explicit ReturnToPool(std::weak_ptr<ObjectPool<T, D>*> pool) : _weakPool(pool) {}
@@ -50,7 +21,17 @@ public:
 		{
 			if (auto pool_ptr = _weakPool.lock())
 			{
-				(*pool_ptr.get())->Push(*ptr);
+				//(*pool_ptr.get())->Push(*ptr);
+				if ((*pool_ptr.get())->IsFull()) //and not set to overflow = allow resize
+				{
+					throw std::length_error("Pool Is Full");
+				}
+				try
+				{
+					ptr->OnAddToPool();
+					(*pool_ptr.get())->_pool.push(std::unique_ptr<T>{ptr});
+				}
+				catch (const std::bad_alloc&) {}
 			}
 			else
 			{
@@ -60,27 +41,38 @@ public:
 	private:
 		std::weak_ptr<ObjectPool<T, D>*> _weakPool;
 	};
+public:
+	using Deleter = ReturnToPool;
+	template <class... Args>
+	ObjectPool(int maxSize = 20, Args const&...args) :_sharedThis(std::make_shared<ObjectPool<T,D>*>(this))
+	{
+		
+		_pool = {};
+		_maxSize = std::abs(maxSize);
+		std::cout << _sharedThis << '\n';
+		for(unsigned int i = 0; i<_maxSize; i++)
+		{
+			_pool.push(std::make_unique<T>(args...));
+		}
+	}
 
+	//disable copy and move semantics as they will break the return to pool deleter
+	ObjectPool(const ObjectPool& other) = delete;
+	ObjectPool(ObjectPool&& other) = delete;
+	ObjectPool& operator = (const ObjectPool& other) = delete;
+	ObjectPool& operator = (ObjectPool&& other) = delete;
 	~ObjectPool() = default;
-
+		
 	size_t Count();
-	unsigned int ActiveCount();
 	std::unique_ptr<T, ReturnToPool> Pop();
-
-	void Push(T& obj);
-	//void Push(std::unique_ptr<T, D> ptr);
-
-
+	bool IsEqualTo(const ObjectPool& other) const;
+private:
 	bool IsFull();
 	bool IsEmpty();
-	bool IsEqualTo(const ObjectPool& other) const;
-	std::shared_ptr<ObjectPool<T, D>*> _sharedThis;
-private:
-	
-	unsigned int  _maxSize = 100;
-	std::stack <T> _pool;
-	unsigned int _activeCount = 0;
 
+	unsigned int  _maxSize = 100;
+	std::stack <std::unique_ptr<T>> _pool;
+	std::shared_ptr<ObjectPool<T, D>*> _sharedThis;
 };
 
 template <typename T, typename D>
@@ -89,34 +81,14 @@ std::unique_ptr<T, typename ObjectPool<T, D>::ReturnToPool> ObjectPool<T, D>::Po
 	if(IsEmpty())
 	{
 		throw std::out_of_range("Pool Is Empty");
-	}
-	
-	
-	std::unique_ptr<T, ReturnToPool> ptr(&_pool.top(),
+	}	
+	std::unique_ptr<T, ReturnToPool> ptr(_pool.top().release(),
 									ReturnToPool(
 									std::weak_ptr<ObjectPool<T,D>*>(_sharedThis)));
 
 	ptr->OnRemoveFromPool();
-
 	_pool.pop();
-	
 	return std::move(ptr);
-}
-
-template <typename T, typename D>
-void ObjectPool<T, D>::Push(T& obj)
-{
-	if(IsFull()) //and not set to overflow = allow resize
-	{
-		throw std::length_error("Pool Is Full");
-		
-	}
-	try
-	{
-		obj.OnAddToPool();
-		_pool.push(obj);
-	}
-	catch (const std::bad_alloc&) {}
 }
 
 
@@ -132,11 +104,6 @@ size_t ObjectPool<T, D>::Count()
 	return _pool.size();
 }
 
-template <typename T, typename D>
-unsigned int ObjectPool<T, D>::ActiveCount()
-{
-	return _activeCount;
-}
 
 template <typename T, typename D>
 bool ObjectPool<T, D>::IsFull()
@@ -155,7 +122,6 @@ bool ObjectPool<T, D>::IsEqualTo(const ObjectPool& other) const
 {
 	return _pool == other._pool && _maxSize == other._maxSize;
 }
-
 
 template<typename T, typename D>
 void swap(ObjectPool<T, D>& a, ObjectPool<T, D>& b)
