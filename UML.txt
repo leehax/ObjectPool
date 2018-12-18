@@ -1,1 +1,5 @@
 %2F%2F Cool Class Diagram, [Client]-Requests Object>[Object Pool| -maxSize: unsigned; -pool : stack; -sharedThis : shared_ptr| +Pop(): unique_ptr; +Count(): unsigned; -IsFull(): bool; -IsEmpty(): bool; -IsEqualTo(other): bool;], [IPoolable| -tickOnRemove : milliseconds;| +OnAddToPool(): void; +OnRemoveFromPool(): void; +TimeAlive(): duration; -IsEqualTo(): bool],[Object Pool]+->[IPoolable], [Client]-uses>[IPoolable]
+
+v2
+
+%2F%2F Cool Class Diagram, [Client]-Requests Object>[Object Pool| -maxSize: unsigned; -pool : stack; -sharedThis : shared_ptr| +Pop(): unique_ptr; +Count(): unsigned; +IsFull(): bool; +IsEmpty(): bool; +IsEqualTo(other): bool;], [IPoolable| -tickOnRemove : milliseconds;| +OnAddToPool(): void; +OnRemoveFromPool(): void; +TimeAlive(): duration; +IsEqualTo(): bool],[Object Pool]+->[Pointer To Object], [Return To Pool| -weakPool : weak_ptr; | operator()(T*ptr);], [Object Pool]<>-[Return To Pool], [Client]-uses>[Pointer To Object],[Pointer To Object]^-.-[IPoolable], [Pointer To Object]uses-.->[Return To Pool]

@@ -26,5 +26,8 @@
     <ClInclude Include="IPoolable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ObjectPool_priv.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

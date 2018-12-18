@@ -1,12 +1,10 @@
 #pragma once
-#include <cstdint>
 #include <chrono>
-#include <iostream>
 class IPoolable
 {
 public:
 	IPoolable() = default;
-	virtual ~IPoolable() {}
+	virtual ~IPoolable() = default;
 	virtual void OnRemoveFromPool();
 	virtual void OnAddToPool();
 	virtual std::chrono::milliseconds TimeAlive();
@@ -15,7 +13,6 @@ protected:
 	std::chrono::time_point<std::chrono::high_resolution_clock> _tickOnCreate=std::chrono::time_point<std::chrono::high_resolution_clock>::min();;
 
 };
-
 inline void IPoolable::OnRemoveFromPool()
 {
 	_tickOnCreate = std::chrono::high_resolution_clock::now();
@@ -23,7 +20,7 @@ inline void IPoolable::OnRemoveFromPool()
 
 inline void IPoolable::OnAddToPool()
 {
-	 _tickOnCreate = std::chrono::time_point<std::chrono::high_resolution_clock>::min();
+	_tickOnCreate = std::chrono::time_point<std::chrono::high_resolution_clock>::min();
 }
 
 inline std::chrono::milliseconds IPoolable::TimeAlive()
@@ -44,3 +41,4 @@ inline bool operator == (const IPoolable& lhs, const IPoolable& rhs)
 {
 	return lhs.IsEqualTo(rhs);
 }
+

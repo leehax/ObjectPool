@@ -147,6 +147,7 @@
   <ItemGroup>
     <ClInclude Include="IPoolable.h" />
     <ClInclude Include="ObjectPool.h" />
+    <ClInclude Include="ObjectPool_priv.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
